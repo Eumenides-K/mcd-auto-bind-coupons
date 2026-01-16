@@ -1,0 +1,126 @@
+name: 自动领取优惠券
+
+on:
+  # 每日北京时间上午9点运行 (UTC+8 = UTC+0 - 8小时)
+  schedule:
+    - cron: '0 1 * * *'  # UTC 1:00 = 北京时间 9:00
+  
+  # 允许手动触发
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  auto-bind-coupons:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        
+      - name: 设置Python环境
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+          
+      - name: 运行优惠券领取脚本
+        id: bind-coupons
+        env:
+          MCD_MCP_TOKEN: ${{ secrets.MCD_MCP_TOKEN }}
+          PYTHONIOENCODING: utf-8
+        run: |
+          python auto_bind_coupons.py > result.json
+          echo "result_file_created=true" >> $GITHUB_OUTPUT
+          
+          # 验证JSON文件的有效性
+          if [ -f "result.json" ]; then
+            if python -c "import json; json.load(open('result.json', encoding='utf-8'))"; then
+              echo "json_valid=true" >> $GITHUB_OUTPUT
+            else
+              echo "json_valid=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "result_file_created=false" >> $GITHUB_OUTPUT
+            echo "json_valid=false" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+        
+      - name: 解析结果
+        id: parse-result
+        run: |
+          if [ -f "result.json" ]; then
+            # 使用单独的Python脚本处理JSON，避免shell编码问题
+            python parse_result.py >> output.txt
+            
+            # 将Python脚本的输出添加到GITHUB_OUTPUT
+            while IFS= read -r line; do
+              echo "$line" >> $GITHUB_OUTPUT
+            done < output.txt
+            
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "has_issue_content=false" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+        
+      - name: 创建或更新Issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let result;
+            const isSuccess = "${{ steps.parse-result.outputs.success }}" === 'true';
+            
+            try {
+              // 使用base64解码来获取原始JSON数据
+              const encodedResult = "${{ steps.parse-result.outputs.encoded_result }}";
+              if (encodedResult) {
+                const decodedResult = Buffer.from(encodedResult, 'base64').toString('utf8');
+                result = JSON.parse(decodedResult);
+              } else {
+                throw new Error('没有找到编码的结果数据');
+              }
+            } catch (error) {
+              console.log('JSON解析失败，使用默认错误结果:', error.message);
+              result = {
+                success: false,
+                error: `JSON解析错误: ${error.message}`,
+                timestamp: new Date().toISOString()
+              };
+            }
+            
+            // 使用Python脚本生成的issue_title和issue_content
+            const title = result.issue_title || '❌ 优惠券自动领取失败';
+            const body = result.issue_content || '无法获取格式化的Issue内容\n\n调试信息:\n- has_issue_content: ' + "${{ steps.parse-result.outputs.has_issue_content }}" + '\n- success: ' + "${{ steps.parse-result.outputs.success }}" + '\n- 原始数据: ' + JSON.stringify(result, null, 2) + '\n\n请检查Python脚本是否正确输出了issue_content字段。';
+
+            // 创建新Issue（不关闭旧Issue）
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['auto-bind-coupons', 'automated']
+            });
+
+            console.log(`Created issue: #${issue.data.number}`);
+            
+      - name: 上传结果文件
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coupon-bind-result
+          path: result.json
+          retention-days: 30
+          
+      - name: 发送通知（失败时）
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            console.log('优惠券领取，任务失败，请检查日志');

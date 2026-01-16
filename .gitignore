@@ -1,0 +1,65 @@
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Editor and IDE configuration
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Python
+__pycache__/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# Environment variables files
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Log files
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+
+# Other tools configuration
+.pytest_cache/
+.mypy_cache/
+
+# Ignore all markdown files
+*.md
+# But keep the main README
+!README.md
+
+.iflow/

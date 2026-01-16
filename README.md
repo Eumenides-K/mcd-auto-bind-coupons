@@ -85,22 +85,6 @@ export MCD_MCP_TOKEN=your_token_here
 python auto_bind_coupons.py
 ```
 
-### 脚本输出
-
-脚本会输出JSON格式的结果，并保存到 `coupon_bind_result.json` 文件中。
-
-## 文件结构
-
-```
-.
-├── .github/
-│   └── workflows/
-│       └── auto-bind-coupons.yml  # GitHub Actions工作流配置
-├── auto_bind_coupons.py           # 主要的Python脚本
-├── requirements.txt               # Python依赖
-└── README.md                      # 说明文档
-```
-
 ## 故障排除
 
 ### 常见问题
